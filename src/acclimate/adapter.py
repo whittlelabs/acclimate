@@ -2,7 +2,7 @@
 Adapter module for acclimate.
 
 This module defines the adapter protocol and provides concrete implementations for common
-resolution strategies. Adapters are used by the TaskRunner to resolve target strings to actual callables.
+resolution strategies. Adapters are used by the CommandRunner to resolve target strings to actual callables.
 """
 
 import importlib

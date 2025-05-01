@@ -56,10 +56,10 @@ commands:
 ### 2. Create a simple runner script
 
 ```python
-from acclimate.runner import TaskRunner
+from acclimate.runner import CommandRunner
 from acclimate.adapter import ImportLibAdapter
 
-# Configure the TaskRunner
+# Configure the CommandRunner
 config = {
     "commands_file": "path/to/commands.yaml",
     "resolvers": {
@@ -67,8 +67,8 @@ config = {
     }
 }
 
-# Create and run the TaskRunner
-runner = TaskRunner(config)
+# Create and run the CommandRunner
+runner = CommandRunner(config)
 runner.run()
 ```
 
@@ -111,7 +111,7 @@ commands:
 
 Example runner setup:
 ```python
-from acclimate.runner import TaskRunner
+from acclimate.runner import CommandRunner
 from acclimate.adapter import ImportLibAdapter, DIAdapter
 from my_di_library import Container
 
@@ -119,7 +119,7 @@ from my_di_library import Container
 container = Container()
 container.register(...)
 
-# Configure the TaskRunner with multiple resolvers
+# Configure the CommandRunner with multiple resolvers
 config = {
     "commands_file": "path/to/commands.yaml",
     "resolvers": {
@@ -128,7 +128,7 @@ config = {
     }
 }
 
-runner = TaskRunner(config)
+runner = CommandRunner(config)
 runner.run()
 ```
 

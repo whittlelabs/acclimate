@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example usage of Acclimate's TaskRunner with custom resolution adapters.
+Example usage of Acclimate's CommandRunner with custom resolution adapters.
 This demonstrates how to configure different resolver strategies.
 """
 
@@ -11,7 +11,7 @@ from typing import Dict, Any, Callable
 # Add src directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from acclimate.runner import TaskRunner
+from acclimate.runner import CommandRunner
 from acclimate.adapter import AdapterProtocol, ImportLibAdapter, DIAdapter
 
 
@@ -73,7 +73,7 @@ def setup_di_container():
 
 
 def main():
-    """Demonstrate how to use TaskRunner with different resolution strategies."""
+    """Demonstrate how to use CommandRunner with different resolution strategies."""
     # Get paths relative to this file
     base_dir = os.path.dirname(os.path.abspath(__file__))
     commands_file = os.path.join(base_dir, "commands.yaml")
@@ -81,7 +81,7 @@ def main():
     # Set up a container for DI resolution
     container = setup_di_container()
     
-    # Configure TaskRunner with multiple resolvers
+    # Configure CommandRunner with multiple resolvers
     config = {
         "commands_file": commands_file,
         "resolvers": {
@@ -96,16 +96,16 @@ def main():
         }
     }
     
-    # Create the TaskRunner
-    runner = TaskRunner(config)
+    # Create the CommandRunner
+    runner = CommandRunner(config)
     
     print("\n=== Acclimate Usage Example ===")
     print("This example demonstrates different resolution strategies.")
     print("You can specify the resolution type in commands.yaml or as defaults.")
     print("Available resolvers in this example: import, di, custom")
-    print("\nRunning TaskRunner with the configured adapters...")
+    print("\nRunning CommandRunner with the configured adapters...")
     
-    # Run the TaskRunner
+    # Run the CommandRunner
     result = runner.run()
     
     print("\nExample complete!")

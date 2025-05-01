@@ -8,14 +8,14 @@ from acclimate.yaml import YamlLoader, YamlLoaderProtocol
 
 T = TypeVar('T', bound=Callable)
 
-class TaskRunner:
+class CommandRunner:
     """
-    A CLI task runner that uses a YAML configuration file to define commands and subcommands,
+    A CLI command runner that uses a YAML configuration file to define commands and subcommands,
     and resolves targets using pluggable resolution strategies.
     """
     def __init__(self, config: Dict[str, Any]):
         """
-        Initialize the TaskRunner with configuration.
+        Initialize the CommandRunner with configuration.
         
         Args:
             config: Dictionary containing configuration options:
@@ -280,12 +280,12 @@ class TaskRunner:
 
 def load_and_run(config: Dict[str, Any]):
     """
-    Legacy convenience function to create and run a TaskRunner instance.
+    Legacy convenience function to create and run a CommandRunner instance.
     
     Args:
         config: Dictionary containing configuration options
     """
-    runner = TaskRunner(config)
+    runner = CommandRunner(config)
     return runner.run()
 
 
