@@ -1,0 +1,17 @@
+# Runtime dependencies
+pyyaml>=6.0  # Used in yaml.py for parsing YAML files
+
+# Development & testing dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+setuptools>=42.0.0
+wheel>=0.37.0
+setuptools_scm[toml]>=6.2
+build>=0.10.0
+twine>=4.0.0
+
+# Optional dependencies for development
+black>=23.0.0  # Code formatting
+mypy>=1.0.0    # Type checking
+isort>=5.12.0  # Import sorting
+flake8>=6.0.0  # Linting

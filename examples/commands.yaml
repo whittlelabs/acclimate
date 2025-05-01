@@ -1,0 +1,129 @@
+common_arguments: &common_arguments
+  prompt:
+    help: "Text to generate pull request changes"
+    positional: true
+    nargs: "?"
+  stdin:
+    help: "Read prompt from stdin instead of an argument"
+    flag: true
+  paste:
+    help: "Read prompt from the clipboard instead of an argument or stdin"
+    flag: true
+  copy:
+    help: "Copy the generated prompt to the clipboard instead of invoking the LLM"
+    flag: true
+  verbose:
+    help: "If set, print verbose debug output to the console"
+    flag: true
+  include:
+    help: "Override include patterns with a pipe-delimited list of glob patterns, e.g. '*.yaml|*.json|*.html'"
+
+# Default settings for all commands
+defaults:
+  # Resolution type: "import" (default) or "di"
+  resolution: "import"
+
+commands:
+  init:
+    help: "Initialize .k directory with configuration templates."
+    target: "@init.init_k_use_case.execute"
+    resolution: "di"
+    arguments:
+      template: "Alias of the template to use for initialization (e.g., nodejs, nextjs, python, dotnet)"
+
+  get:
+    help: "Get some resource"
+    subcommands:
+      openai:
+        help: "Get an OpenAI resource"
+        subcommands:
+          models:
+            help: "Get the list of available models"
+            target: "@openai.client.get_models"
+            resolution: "di"
+            print_result: true
+            print_map:
+              format: table
+              columns:
+                - id
+              order_by: id
+      anthropic:
+        help: "Get an Anthropic resource"
+        subcommands:
+          models:
+            help: "Get the list of available Anthropic models"
+            target: "@anthropic.client.get_models"
+            resolution: "di"
+            print_result: true
+            print_map:
+              format: table
+              columns:
+                - id
+              order_by: id
+      google:
+        help: "Get a Google resource"
+        subcommands:
+          models:
+            help: "Get the list of available Google models"
+            target: "@google.client.get_models"
+            resolution: "di"
+            print_result: true
+            print_map:
+              format: table
+              columns:
+                - id
+              order_by: id
+
+  traceback:
+    aliases: ["tb"]
+    help: "Build a troubleshooting prompt from a traceback on the clipboard"
+    target: "@traceback.build_troubleshooting_prompt_use_case.execute"
+    resolution: "di"
+  change:
+    aliases: ["c", "changeset", "pr"]
+    help: "Generate changes based on a prompt."
+    target: "@agency.create_changeset_use_case.execute"
+    resolution: "di"
+    arguments:
+      <<: *common_arguments
+      followup:
+        help: "If set, append to memory file and include its contents in the LLM prompt for incremental updates."
+        flag: true
+  advise:
+    help: "Generate code advice for the project"
+    target: "@agency.get_code_advice_use_case.execute"
+    resolution: "di"
+    arguments:
+      <<: *common_arguments
+      followup:
+        help: "If set, append to memory file and include its contents in the LLM prompt for incremental updates."
+        flag: true
+  plan:
+    help: "Generate project plan based on a prompt by creating user stories. Use the --copy flag to copy the generated plan prompt to the clipboard instead of invoking the LLM."
+    target: "@agency.create_project_plan_use_case.execute"
+    resolution: "di"
+    arguments:
+      <<: *common_arguments
+  add:
+    help: "Add entries to project configuration files."
+    subcommands:
+      rule:
+        help: "Append a rule to .k/rules.txt."
+        target: "@agency.add_rule_use_case.execute"
+        resolution: "di"
+        arguments:
+          rule:
+            help: "The rule text to be added to .k/rules.txt."
+            positional: true
+  implement:
+    help: "Implement changeset from clipboard. Reads a structured changeset response and applies the changes."
+    target: "@agency.implement_changeset_use_case.execute"
+    resolution: "di"
+    arguments:
+      verbose:
+        help: "Print verbose debug output to the console"
+        flag: true
+  schema:
+    help: "Copy the contents of openapi_changeset_schema.json to the clipboard."
+    target: "@agency.copy_schema_use_case.execute"
+    resolution: "di"

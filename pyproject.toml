@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acclimate"
+description = "A CLI command runner with YAML config and configurable targets."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Keith Morris", email = "keith@whittlelabs.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+    "pyyaml>=6.0",
+]
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://github.com/whittlelabs/acclimate"
+"Bug Tracker" = "https://github.com/whittlelabs/acclimate/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["acclimate*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools_scm]
+write_to = "src/acclimate/_version.py"
+version_scheme = "post-release"
+local_scheme = "node-and-date"
