@@ -1,12 +1,12 @@
 """
-Tests for the acclimate.adapter module.
+Tests for the acclimate.resolution module.
 """
 import pytest
 from unittest.mock import MagicMock
 from typing import Callable
 
-from acclimate.adapter import (
-    AdapterProtocol,
+from acclimate.resolution import (
+    ResolutionAdapterProtocol,
     ImportLibAdapter,
     DIAdapter
 )
@@ -123,7 +123,7 @@ def test_custom_adapter_protocol():
     
     # Verify it works with the protocol
     adapter = CustomAdapter()
-    assert isinstance(adapter, AdapterProtocol)
+    assert isinstance(adapter, ResolutionAdapterProtocol)
     
     # Test resolving a target
     resolved = adapter("anything")

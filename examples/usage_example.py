@@ -6,14 +6,14 @@ This demonstrates how to configure different resolver strategies.
 
 import os
 import sys
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, Optional, IO
 
 # Add src directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from acclimate.runner import CommandRunner
-from acclimate.adapter import AdapterProtocol, ImportLibAdapter, DIAdapter
-
+from acclimate.resolution import ResolutionAdapterProtocol, ImportLibAdapter, DIAdapter
+from acclimate.output import OutputAdapterProtocol
 
 # Example class that we'll use for demonstration purposes
 class ExampleService:
@@ -61,6 +61,62 @@ class CustomAdapter:
         return fixed_func
 
 
+# Example of a custom formatter that implements the FormatterProtocol
+class ModelsAdapter:
+    """
+    A custom formatter that demonstrates how to implement the FormatterProtocol.
+    This formatter is designed for displaying model lists in a user-friendly way.
+    """
+    
+    def format(self, result: Any, output: Optional[IO] = None) -> Optional[str]:
+        """
+        Format model information into a nice display.
+        
+        Args:
+            result: The result to format (expected to be a list of models or similar)
+            output: Optional output stream to write to (defaults to stdout)
+            
+        Returns:
+            The formatted string representation if output is None, otherwise None
+        """
+        # Extract models from various possible result structures
+        models = []
+        if isinstance(result, list):
+            models = result
+        elif isinstance(result, dict) and "data" in result:
+            models = result["data"]
+        else:
+            models = [result]
+            
+        # Format the models as a pretty list
+        lines = ["=== Available Models ==="]
+        
+        for i, model in enumerate(models, 1):
+            # Extract ID if it's a dict or attribute, otherwise use str representation
+            if isinstance(model, dict):
+                model_id = model.get("id", f"Model {i}")
+                model_details = model.get("details", "No details available")
+            else:
+                model_id = getattr(model, "id", f"Model {i}")
+                model_details = getattr(model, "details", "No details available")
+                
+            lines.append(f"\n{i}. {model_id}")
+            lines.append(f"   {model_details}")
+        
+        lines.append("\n=== End of Models ===")
+        
+        # Join all lines
+        result_str = "\n".join(lines)
+        
+        # Output to the stream or return as string
+        if output:
+            output.write(result_str)
+            output.write("\n")
+            return None
+        else:
+            return result_str
+
+
 def setup_di_container():
     """Set up a simple DI container with some services."""
     container = SimpleContainer()
@@ -81,9 +137,13 @@ def main():
     # Set up a container for DI resolution
     container = setup_di_container()
     
-    # Configure CommandRunner with multiple resolvers
+    # Configure CommandRunner with multiple resolvers and formatters
     config = {
         "commands_file": commands_file,
+        "formatters": {
+            # Custom formatter for model output
+            "models": ModelsAdapter()
+        },
         "resolvers": {
             # Standard import-based resolver
             "import": ImportLibAdapter(),
@@ -103,6 +163,7 @@ def main():
     print("This example demonstrates different resolution strategies.")
     print("You can specify the resolution type in commands.yaml or as defaults.")
     print("Available resolvers in this example: import, di, custom")
+    print("Available formatters in this example: models (custom), table, json (built-in)")
     print("\nRunning CommandRunner with the configured adapters...")
     
     # Run the CommandRunner

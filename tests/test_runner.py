@@ -6,10 +6,12 @@ import sys
 import pytest
 from unittest.mock import patch, MagicMock, call
 from argparse import Namespace
+import io
 
 from acclimate.runner import CommandRunner
-from acclimate.adapter import ImportLibAdapter, DIAdapter
+from acclimate.resolution import ImportLibAdapter, DIAdapter
 from acclimate.yaml import YamlLoader
+from acclimate.output import OutputAdapterProtocol
 from tests.resources.test_module import MockContainer, SampleService
 
 
@@ -31,6 +33,11 @@ def test_command_runner_init_with_defaults():
         
         # Should use the provided YamlLoader
         assert isinstance(runner.yaml_loader, YamlLoader)
+        
+        # Should initialize default formatters
+        assert "table" in runner.formatters
+        assert "json" in runner.formatters
+        assert "models" in runner.formatters
 
 
 def test_command_runner_init_with_custom_resolvers():
@@ -52,6 +59,45 @@ def test_command_runner_init_with_custom_resolvers():
         
         # Should still have the default resolver
         assert "import" in runner.resolvers
+
+
+def test_command_runner_init_with_custom_formatters():
+    """Test that CommandRunner initializes with custom formatters."""
+    # Create a mock formatter that implements the FormatterProtocol
+    custom_formatter = MagicMock()
+    custom_formatter.format = MagicMock(return_value="Formatted output")
+    
+    with patch('acclimate.yaml.YamlLoader.load_yaml', return_value={"commands": {}}):
+        runner = CommandRunner({
+            "commands_file": "dummy.yaml",
+            "formatters": {
+                "custom": custom_formatter
+            }
+        })
+        
+        # Should include the custom formatter
+        assert "custom" in runner.formatters
+        assert runner.formatters["custom"] is custom_formatter
+        
+        # Should still have the default formatters
+        assert "table" in runner.formatters
+        assert "json" in runner.formatters
+
+
+def test_command_runner_validates_formatter_protocol():
+    """Test that CommandRunner validates formatters implement FormatterProtocol."""
+    # Create an invalid formatter that doesn't implement the protocol
+    invalid_formatter = MagicMock()
+    delattr(invalid_formatter, "format")  # Remove the format method
+    
+    with patch('acclimate.yaml.YamlLoader.load_yaml', return_value={"commands": {}}):
+        with pytest.raises(TypeError):
+            CommandRunner({
+                "commands_file": "dummy.yaml",
+                "formatters": {
+                    "invalid": invalid_formatter
+                }
+            })
 
 
 def test_command_runner_init_with_custom_yaml_loader():
@@ -146,7 +192,7 @@ def test_command_runner_integration_with_tempfile(temp_yaml_file):
     
     # Create a mock for the sys.argv to simulate command-line arguments
     with patch('sys.argv', ['acclimate', 'test', 'test_arg']), \
-         patch('acclimate.adapter.ImportLibAdapter.__call__', mock_adapter):
+         patch('acclimate.resolution.ImportLibAdapter.__call__', mock_adapter):
         
         # Create the runner and run it
         runner = CommandRunner({
@@ -215,14 +261,22 @@ def test_format_result_table():
             "header": "true"
         }
         
-        result = runner.format_result(data, print_map)
-        expected = "id | name\n---------\n1 | Item 1\n2 | Item 2"
-        
-        # Normalize whitespace for comparison
-        result = result.replace(" ", "")
-        expected = expected.replace(" ", "")
-        
-        assert result == expected
+        # Capture stdout to verify the output
+        with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+            result = runner.format_result(data, print_map)
+            
+            # Result is now None since it's written directly to stdout
+            assert result is None
+            
+            # Instead, check the captured stdout
+            output = mock_stdout.getvalue()
+            expected = "id | name\n---------\n1 | Item 1\n2 | Item 2"
+            
+            # Normalize whitespace for comparison
+            output = output.strip().replace(" ", "")
+            expected = expected.replace(" ", "")
+            
+            assert output == expected
 
 
 def test_format_result_json():
@@ -240,8 +294,109 @@ def test_format_result_json():
             "format": "json"
         }
         
-        result = runner.format_result(data, print_map)
-        assert '"id": 1' in result
-        assert '"name": "Item 1"' in result
-        assert '"id": 2' in result
-        assert '"name": "Item 2"' in result
+        # Capture stdout to verify the output
+        with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
+            result = runner.format_result(data, print_map)
+            
+            # Result is now None since it's written directly to stdout
+            assert result is None
+            
+            # Instead, check the captured stdout
+            output = mock_stdout.getvalue()
+            assert '"id": 1' in output
+            assert '"name": "Item 1"' in output
+            assert '"id": 2' in output
+            assert '"name": "Item 2"' in output
+
+
+def test_command_runner_runs_with_format_property(temp_yaml_file):
+    """Test that the 'format' property in command YAML is used for formatting."""
+    yaml_file, _ = temp_yaml_file
+    
+    # Create a mock for sys.argv to simulate command-line arguments
+    # Create a mock for the formatter
+    mock_formatter = MagicMock()
+    mock_formatter.format = MagicMock(return_value="Custom formatted output")
+    
+    # Create a mock command result
+    result_data = {"data": "test"}
+    mock_function = MagicMock(return_value=result_data)
+    
+    with patch('sys.argv', ['acclimate', 'format_test']), \
+         patch('sys.stdout', new_callable=io.StringIO):
+        
+        # Create a CommandRunner with our mock formatter
+        runner = CommandRunner({
+            "commands_file": yaml_file,
+            "formatters": {
+                "test_fmt": mock_formatter
+            }
+        })
+        
+        # Add a test command that uses the format property
+        runner.commands_dict["format_test"] = {
+            "target": "test.target",
+            "format": "test_fmt"
+        }
+        
+        # Mock the target resolution
+        runner._resolve_target = MagicMock(return_value=mock_function)
+        
+        # Run the CommandRunner
+        runner.run()
+        
+        # Verify the function was called
+        mock_function.assert_called_once()
+        
+        # Verify our formatter was called with the result
+        mock_formatter.format.assert_called_once_with(result_data, output=sys.stdout)
+
+
+def test_format_using_internal_formatter():
+    """Test the _format_result method using a registered formatter."""
+    with patch('acclimate.yaml.YamlLoader.load_yaml', return_value={"commands": {}}):
+        runner = CommandRunner({"commands_file": "dummy.yaml"})
+        
+        # Create a mock formatter
+        mock_formatter = MagicMock()
+        mock_formatter.format = MagicMock(return_value="Formatted output")
+        
+        # Register the mock formatter
+        runner.formatters["test_fmt"] = mock_formatter
+        
+        # Test formatting with the registered formatter
+        data = {"id": 1, "name": "Test Item"}
+        runner._format_result(data, "test_fmt")
+        
+        # Verify the formatter was called with the right data
+        mock_formatter.format.assert_called_once()
+        args, kwargs = mock_formatter.format.call_args
+        assert args[0] == data  # First positional arg should be the data
+
+
+def test_backward_compatibility_with_print_map():
+    """Test that the old print_map still works for backward compatibility."""
+    with patch('acclimate.yaml.YamlLoader.load_yaml', return_value={"commands": {}}):
+        runner = CommandRunner({"commands_file": "dummy.yaml"})
+        
+        # Mock the table formatter
+        mock_table_formatter = MagicMock()
+        mock_table_formatter.format = MagicMock(return_value="Table formatted")
+        runner.formatters["table"] = mock_table_formatter
+        
+        # Test with old-style print_map
+        data = [{"id": 1, "name": "Item 1"}]
+        print_map = {
+            "format": "table",
+            "columns": ["id", "name"],
+            "header": "true"
+        }
+        
+        runner._format_result(data, **print_map)
+        
+        # Verify the table formatter was used
+        mock_table_formatter.format.assert_called_once()
+        
+        # Verify table formatter was updated with the print_map options
+        assert mock_table_formatter.columns == ["id", "name"]
+        assert mock_table_formatter.header is True

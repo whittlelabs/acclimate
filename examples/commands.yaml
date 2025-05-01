@@ -41,12 +41,7 @@ commands:
             help: "Get the list of available models"
             target: "@openai.client.get_models"
             resolution: "di"
-            print_result: true
-            print_map:
-              format: table
-              columns:
-                - id
-              order_by: id
+            format: "models"
       anthropic:
         help: "Get an Anthropic resource"
         subcommands:
@@ -54,12 +49,7 @@ commands:
             help: "Get the list of available Anthropic models"
             target: "@anthropic.client.get_models"
             resolution: "di"
-            print_result: true
-            print_map:
-              format: table
-              columns:
-                - id
-              order_by: id
+            format: "models"
       google:
         help: "Get a Google resource"
         subcommands:
@@ -67,12 +57,7 @@ commands:
             help: "Get the list of available Google models"
             target: "@google.client.get_models"
             resolution: "di"
-            print_result: true
-            print_map:
-              format: table
-              columns:
-                - id
-              order_by: id
+            format: "models"
 
   traceback:
     aliases: ["tb"]

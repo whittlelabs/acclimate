@@ -6,13 +6,14 @@ resolution strategies. Adapters are used by the CommandRunner to resolve target 
 """
 
 import importlib
-from typing import Any, Callable, Protocol, TypeVar, runtime_checkable
+import sys
+from typing import Any, Callable, Protocol, TypeVar, runtime_checkable, Optional, Union, IO
 
 T = TypeVar('T', bound=Callable)
 
 
 @runtime_checkable
-class AdapterProtocol(Protocol):
+class ResolutionAdapterProtocol(Protocol):
     """
     Protocol defining the interface for target resolution adapters.
     
@@ -35,8 +36,7 @@ class AdapterProtocol(Protocol):
         """
         ...
 
-
-class ImportLibAdapter:
+class ImportLibAdapter(ResolutionAdapterProtocol):
     """
     Adapter that resolves targets using Python's importlib.
     
@@ -122,7 +122,7 @@ class ImportLibAdapter:
             raise ValueError(f"Could not resolve target {target}: {e}")
 
 
-class DIAdapter:
+class DIAdapter(ResolutionAdapterProtocol):
     """
     Adapter for Dependency Injection containers.
     

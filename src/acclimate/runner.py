@@ -1,10 +1,12 @@
 import argparse
 import json
 import os
+import sys
 from typing import Dict, Any, Optional, Union, Callable, TypeVar
 
-from acclimate.adapter import AdapterProtocol, ImportLibAdapter
+from acclimate.resolution import ResolutionAdapterProtocol, ImportLibAdapter
 from acclimate.yaml import YamlLoader, YamlLoaderProtocol
+from acclimate.output import OutputAdapterProtocol, DEFAULT_FORMATTERS
 
 T = TypeVar('T', bound=Callable)
 
@@ -22,6 +24,8 @@ class CommandRunner:
                 - commands_file: Path to the commands YAML file (required)
                 - resolvers: Dictionary mapping resolution types to adapter instances
                   Each adapter must implement the AdapterProtocol interface
+                - formatters: Dictionary mapping formatter names to formatter instances
+                  Each formatter must implement the FormatterProtocol interface
                 - yaml_loader: Optional YamlLoader instance (defaults to acclimate.yaml.YamlLoader)
         """
         self.commands_file = config.get("commands_file")
@@ -38,6 +42,20 @@ class CommandRunner:
         # Ensure we have at least one resolver
         if not self.resolvers:
             self.resolvers = {"import": ImportLibAdapter()}
+            
+        # Initialize formatters
+        self.formatters = {}
+        
+        # Add any default formatters
+        for fmt_name, fmt_class in DEFAULT_FORMATTERS.items():
+            self.formatters[fmt_name] = fmt_class()
+            
+        # Add user-provided formatters (which override defaults with the same name)
+        user_formatters = config.get("formatters", {})
+        for fmt_name, formatter in user_formatters.items():
+            if not isinstance(formatter, OutputAdapterProtocol):
+                raise TypeError(f"Formatter {fmt_name} does not implement FormatterProtocol")
+            self.formatters[fmt_name] = formatter
         
         # Get or create yaml loader
         self.yaml_loader = config.get("yaml_loader")
@@ -79,11 +97,55 @@ class CommandRunner:
             raise ValueError(f"Unknown resolution type: {resolution_type}. Available types: {available_resolvers}")
             
         # Verify the resolver implements the adapter protocol
-        if not isinstance(resolver, AdapterProtocol):
+        if not isinstance(resolver, ResolutionAdapterProtocol):
             raise TypeError(f"Resolver for {resolution_type} does not implement AdapterProtocol")
             
         # Resolve the target using the adapter
         return resolver(target)
+
+    def _format_result(self, result, formatter_name=None, **formatter_options):
+        """
+        Format a result using a named formatter or formatter options.
+        
+        Args:
+            result: The result to format
+            formatter_name: Name of a registered formatter to use
+            **formatter_options: Options to pass to the formatter or to
+                                create a new formatter instance.
+            
+        Returns:
+            The formatted result string
+        """
+        # If we have a formatter name, use that registered formatter
+        if formatter_name and formatter_name in self.formatters:
+            return self.formatters[formatter_name].format(result, output=sys.stdout)
+        
+        # For backward compatibility with print_map
+        if formatter_options:
+            fmt = formatter_options.get("format", "table")
+            
+            # Handle table format
+            if fmt == "table":
+                columns = formatter_options.get("columns", [])
+                order_by = formatter_options.get("order_by")
+                header = formatter_options.get("header", "true") == "true"
+                
+                # Use TableFormatter from default formatters
+                if "table" in self.formatters:
+                    formatter = self.formatters["table"]
+                    # Update formatter attributes based on options
+                    formatter.columns = columns
+                    formatter.order_by = order_by
+                    formatter.header = header
+                    return formatter.format(result, output=sys.stdout)
+                    
+            # Handle JSON format
+            elif fmt == "json" and "json" in self.formatters:
+                return self.formatters["json"].format(result, output=sys.stdout)
+            
+        # If no formatter, just print the string representation
+        print(result)
+        return str(result)
 
     def build_subcommands(self, subparsers, commands_dict):
         """Build subcommand parsers recursively from the command configuration."""
@@ -101,12 +163,16 @@ class CommandRunner:
                 # Store resolution type if specified
                 if "resolution" in cmd_info:
                     subparser.set_defaults(resolution=cmd_info["resolution"])
-
-            # Optional flags
-            if "print_result" in cmd_info:
-                subparser.set_defaults(print_result=cmd_info["print_result"])
-            if "print_map" in cmd_info:
-                subparser.set_defaults(print_map=cmd_info["print_map"])
+                    
+                # Store format information
+                if "format" in cmd_info:
+                    subparser.set_defaults(format=cmd_info["format"])
+                
+                # For backward compatibility
+                if "print_result" in cmd_info:
+                    subparser.set_defaults(print_result=cmd_info["print_result"])
+                if "print_map" in cmd_info:
+                    subparser.set_defaults(print_map=cmd_info["print_map"])
 
             # Add known arguments (positional or optional)
             for arg_name, arg_value in cmd_info.get("arguments", {}).items():
@@ -169,50 +235,10 @@ class CommandRunner:
 
         return kwargs
 
+    # Keep for backward compatibility
     def format_result(self, result, print_map):
-        """ Formatting logic for the results. """
-        fmt = print_map.get("format", "table")
-        columns = print_map.get("columns", [])
-        order_by = print_map.get("order_by", None)
-        print_header = print_map.get("header", "true") == "true"
-
-        if hasattr(result, "data"):
-            data = result.data
-        elif isinstance(result, list):
-            data = result
-        else:
-            return str(result)
-
-        if order_by:
-            def get_key_value(item):
-                if isinstance(item, dict):
-                    return item.get(order_by)
-                else:
-                    return getattr(item, order_by, None)
-            data = sorted(data, key=get_key_value)
-
-        if fmt == "json":
-            return json.dumps(data, indent=2, default=str)
-        elif fmt == "table":
-            if not columns:
-                return str(data)
-            lines = []
-            header = " | ".join(columns)
-            separator = "-" * len(header)
-            if print_header:
-                lines.append(header)
-                lines.append(separator)
-
-            for item in data:
-                row_cells = []
-                for col in columns:
-                    # handle dict vs. object
-                    val = item.get(col) if isinstance(item, dict) else getattr(item, col, None)
-                    row_cells.append(str(val))
-                lines.append(" | ".join(row_cells))
-            return "\n".join(lines)
-
-        return str(result)
+        """DEPRECATED: Use _format_result instead. Will be removed in a future version."""
+        return self._format_result(result, **print_map)
 
     def run(self):
         """Parse arguments and execute the requested command."""
@@ -248,8 +274,13 @@ class CommandRunner:
 
         # 3) Build a dictionary from the known argparse results
         args_dict = vars(args).copy()
+        
+        # Extract formatting options
+        formatter = args_dict.pop("format", None)
         print_result = args_dict.pop("print_result", False)
         print_map = args_dict.pop("print_map", None)
+        
+        # Clean up other non-function args
         args_dict.pop("target", None)
         args_dict.pop("top_command", None)
         args_dict.pop("resolution", None)  # Remove resolution if it exists
@@ -268,8 +299,12 @@ class CommandRunner:
         # 6) Call the function with known + dynamic arguments
         result = func(**args_dict)
 
-        # 7) Print result if requested
-        if print_result:
+        # 7) Format and print result if requested
+        if formatter:
+            # New way using formatters
+            self._format_result(result, formatter)
+        elif print_result:
+            # Legacy way for backward compatibility
             if print_map:
                 print(self.format_result(result, print_map))
             else:
